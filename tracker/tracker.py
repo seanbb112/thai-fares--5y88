@@ -244,6 +244,25 @@ def run():
     return meta, results
 
 
+def update_daily_low(meta, results, through_tr):
+    """Keep the cheapest valid itinerary seen on each (Irish) calendar day, with when it was seen."""
+    path = DATA / "daily_low.json"
+    lows = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    cands = []
+    if through_tr:
+        cands.append({"kind": "through", "price": through_tr[0]["price"], "it": through_tr[0]})
+    if results["stopover"]:
+        cands.append({"kind": "stopover", "price": results["stopover"][0]["price"], "it": results["stopover"][0]})
+    if not cands:
+        return
+    best = min(cands, key=lambda c: c["price"])
+    day = meta["finished"][:10]
+    if day not in lows or best["price"] < lows[day]["price"]:
+        lows[day] = {**best, "seen": meta["finished"]}
+    lows = dict(sorted(lows.items())[-30:])  # last 30 days is plenty
+    path.write_text(json.dumps(lows), encoding="utf-8")
+
+
 def write(meta, results):
     DATA.mkdir(exist_ok=True)
     DASH.mkdir(exist_ok=True)
@@ -287,13 +306,18 @@ def write(meta, results):
                     w.writerow([ts, r["kind"], f"{r['origin']}-{r['dest']} {r['date']}", r["cheapest"]])
         log(f"ok {meta['queries']} queries, {len(meta['errors'])} errors, "
             f"best through {best_t['price'] if best_t else 'none'}, best stopover {best_s['price'] if best_s else 'none'}")
+        update_daily_low(meta, results, through_tr)
+
+    daily_low = {}
+    if (DATA / "daily_low.json").exists():
+        daily_low = json.loads((DATA / "daily_low.json").read_text(encoding="utf-8"))
 
     history = []
     hist = DATA / "history.csv"
     if hist.exists():
         with open(hist, encoding="utf-8") as f:
             history = [r for r in csv.DictReader(f)]
-    payload = {"meta": meta, "results": results, "history": history}
+    payload = {"meta": meta, "results": results, "history": history, "daily_low": daily_low}
     (DASH / "data.js").write_text("window.TRACKER = " + json.dumps(payload) + ";\n", encoding="utf-8")
 
 

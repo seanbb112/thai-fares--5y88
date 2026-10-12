@@ -63,7 +63,7 @@ h2::before { content: ""; width: 6px; height: 20px; border-radius: 3px; backgrou
 .tile::after { content: ""; position: absolute; right: -40px; top: -40px; width: 120px; height: 120px; border-radius: 50%; background: var(--tc); opacity: 0.10; }
 .tile:nth-child(1) { --tc: linear-gradient(90deg, #00a8ff, #2a78d6); } .tile:nth-child(2) { --tc: linear-gradient(90deg, #ff7a18, #ff3d77); }
 .tile:nth-child(3) { --tc: linear-gradient(90deg, #00a8ff, #7b3cff); } .tile:nth-child(4) { --tc: linear-gradient(90deg, #ffb300, #ff7a18); }
-.tile:nth-child(5) { --tc: linear-gradient(90deg, #00b894, #0ca30c); } .tile:nth-child(6) { --tc: linear-gradient(90deg, #7b3cff, #e87ba4); }
+.tile:nth-child(5) { --tc: linear-gradient(90deg, #00b894, #0ca30c); } .tile:nth-child(7) { --tc: linear-gradient(90deg, #ff3d77, #ffb300); } .tile:nth-child(6) { --tc: linear-gradient(90deg, #7b3cff, #e87ba4); }
 .tile .label { color: var(--ink-2); font-size: 13px; font-weight: 600; }
 .tile .value { font-size: 34px; font-weight: 700; margin: 4px 0; letter-spacing: -0.02em; }
 .tile .detail { color: var(--ink-2); font-size: 12px; }
@@ -251,7 +251,7 @@ a.btn.big { font-size: 14px; padding: 9px 16px; }
   const ageMin = (Date.now() - fin) / 60000;
   $("#updated").innerHTML = `<span class="dot" style="background:${ageMin < 90 ? "var(--good)" : "var(--warn)"}"></span>Updated ${ddmmyy(meta.finished)} ${meta.finished.slice(11,16)} · ${meta.queries} searches`;
   const alerts = [];
-  if (ageMin > 90) alerts.push(`<div class="warnbox">⚠ Last successful update was ${Math.round(ageMin/60)} hours ago. Check that the hourly task is running and that the PC is on.</div>`);
+  if (ageMin > 90) alerts.push(`<div class="warnbox">⚠ Last successful update was ${Math.round(ageMin/60)} hours ago. GitHub's hourly run may be late; it usually catches up.</div>`);
   if (meta.last_attempt_failed) alerts.push(`<div class="warnbox critbox">✖ The run at ${dt(meta.last_attempt_failed)} failed (Google may be rate-limiting). Showing the last good data.</div>`);
   if (meta.errors && meta.errors.length) alerts.push(`<div class="warnbox">⚠ ${meta.errors.length} of ${meta.queries} searches failed this run. Those routes may be missing.</div>`);
   $("#alerts").innerHTML = alerts.join("");
@@ -277,6 +277,27 @@ a.btn.big { font-size: 14px; padding: 9px 16px; }
   const thTrip = (t) => t && { kind: "through", price: t.price, date: t.date, parts: [{ it: t, book: bookOf(t), label: "Book this flight" }] };
   const soTrip = (s) => s && { kind: "stopover", price: s.price, date: s.date, hub: s.hub, parts: [
     { it: s.leg1, book: bookOf(s.leg1), label: "Book flight 1" }, { it: s.leg2, book: bookOf(s.leg2), label: "Book flight 2" }] };
+  // Today's low: cheapest valid fare seen in any run today (Irish date), vs yesterday's low
+  {
+    const lows = T.daily_low || {};
+    const today = meta.finished.slice(0, 10);
+    const yday = new Date(new Date(today + "T12:00:00") - 86400000).toISOString().slice(0, 10);
+    const histLow = (day) => {   // fallback for days before daily_low existed: price only
+      const ps = history.filter(r => r.kind === "best" && r.run.startsWith(day)).map(r => +r.price_eur);
+      return ps.length ? { price: Math.min(...ps) } : null;
+    };
+    const lt = lows[today] || histLow(today), ly = lows[yday] || histLow(yday);
+    if (lt) {
+      const delta = ly ? lt.price - ly.price : null;
+      const change = delta == null ? "" : delta === 0 ? " · same as yesterday" : delta < 0 ? ` · ▼ ${eur(-delta)} vs yesterday` : ` · ▲ ${eur(delta)} vs yesterday`;
+      const it = lt.it;
+      const where = !it ? "" : lt.kind === "stopover" ? `via ${it.hub}, ${it.nights} night${it.nights === 1 ? "" : "s"} · ` : `${routeStr(it)} · `;
+      tiles.push({ label: "Today's low", v: lt.price,
+        d: `${where}${lt.seen ? "seen " + lt.seen.slice(11, 16) : "today"}${change}`,
+        g: it && (lt.kind === "stopover" ? gulfIn(it.leg1, it.leg2) : gulfIn(it)),
+        trip: it && (lt.kind === "stopover" ? soTrip(it) : thTrip(it)) });
+    }
+  }
   tdates.forEach(d => {
     const t = firstOn(results.through, d);
     tiles.push({ label: `Cheapest through-ticket, leave ${short(d)}`, v: t && t.price, d: t ? `${routeStr(t)} · ${t.airlines.join(", ")}` : "None found", g: gulfIn(t), trip: thTrip(t) });
