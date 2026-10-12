@@ -249,7 +249,9 @@ a.btn.big { font-size: 14px; padding: 9px 16px; }
   // freshness
   const fin = new Date(meta.finished);
   const ageMin = (Date.now() - fin) / 60000;
-  $("#updated").innerHTML = `<span class="dot" style="background:${ageMin < 90 ? "var(--good)" : "var(--warn)"}"></span>Updated ${ddmmyy(meta.finished)} ${meta.finished.slice(11,16)} · ${meta.queries} searches`;
+  $("#updated").innerHTML = `<span class="dot" style="background:${ageMin < 90 ? "var(--good)" : "var(--warn)"}"></span>Updated ${ddmmyy(meta.finished)} ${meta.finished.slice(11,16)} · ${meta.mode === "quick"
+      ? `quick check of top ${(meta.watchlist || []).length} routes · full search ${meta.last_full.slice(11,16)}`
+      : `full search, ${meta.queries} searches`}`;
   const alerts = [];
   if (ageMin > 90) alerts.push(`<div class="warnbox">⚠ Last successful update was ${Math.round(ageMin/60)} hours ago. GitHub's hourly run may be late; it usually catches up.</div>`);
   if (meta.last_attempt_failed) alerts.push(`<div class="warnbox critbox">✖ The run at ${dt(meta.last_attempt_failed)} failed (Google may be rate-limiting). Showing the last good data.</div>`);

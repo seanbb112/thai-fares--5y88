@@ -7,8 +7,9 @@ primp), and writes:
   ../dashboard/data.js  what the dashboard loads
   ../data/run.log       one line per run, plus any errors
 
-Run once:      python tracker.py
-Scheduled:     see ../README.md (Windows Task Scheduler, hourly)
+Full search:   python tracker.py           (every route; picks the 5-route watchlist)
+Quick check:   python tracker.py --quick   (only the watchlist; rest kept from the last full search)
+Scheduled:     ../.github/workflows/track.yml (quick every 30 min, full every 2 hours)
 """
 
 import csv
@@ -145,7 +146,26 @@ def search(origin, dest, date, max_stops):
     return url, sorted(seen.values(), key=lambda x: x["price"])
 
 
-def run():
+def pick_watchlist(results, travel_dates, n=5):
+    """The n search routes giving the cheapest valid fares; a stopover pair counts as one route."""
+    best = {}
+    for t in results["through"]:
+        if t["date"] in travel_dates:
+            k = ("through", t["origin"], t["dest"], t["date"])
+            best[k] = min(best.get(k, 1e9), t["price"])
+    for s in results["stopover"]:
+        k = ("stopover", s["date"], s["hub"], s["dest"], s["leg2"]["legs"][0]["dep"][:10])
+        best[k] = min(best.get(k, 1e9), s["price"])
+    out = []
+    for k, price in sorted(best.items(), key=lambda kv: kv[1])[:n]:
+        if k[0] == "through":
+            out.append({"type": "through", "origin": k[1], "dest": k[2], "date": k[3], "price": price})
+        else:
+            out.append({"type": "stopover", "date": k[1], "hub": k[2], "dest": k[3], "date2": k[4], "price": price})
+    return out
+
+
+def run(mode="full"):
     started = now_irl()
     tc, sc = CONFIG["through"], CONFIG["stopover"]
     travel_dates = CONFIG["travel_dates"]
@@ -153,26 +173,37 @@ def run():
     # Must be in Thailand by this time (Thai local time, as Google reports arrivals)
     arrive_by = datetime.fromisoformat(CONFIG["arrive_by"]) if CONFIG.get("arrive_by") else None
 
+    prev = None
+    if (DATA / "latest.json").exists():
+        prev = json.loads((DATA / "latest.json").read_text(encoding="utf-8"))
+    watch = (prev or {}).get("meta", {}).get("watchlist") or []
+    if mode == "quick" and not watch:
+        mode = "full"  # nothing to watch yet: do a full search first
+
     def on_time(it):
         return arrive_by is None or datetime.fromisoformat(it["legs"][-1]["arr"]) <= arrive_by
 
-    # 1. Through-tickets (one ticket, direct or one stop); compare dates from Dublin only
-    for date in travel_dates + CONFIG["compare_dates"]:
-        origins = tc["origins"] if date in travel_dates else ["DUB"]
-        for o in origins:
-            for d in tc["destinations"]:
-                url, its = search(o, d, date, tc["max_stops"])
-                if its:
-                    its = [it for it in its if on_time(it)]
-                results["routes"].append({"kind": "through", "origin": o, "dest": d, "date": date,
-                                          "url": url, "ok": its is not None,
-                                          "count": len(its or []),
-                                          "cheapest": its[0]["price"] if its else None})
-                for it in its or []:
-                    results["through"].append({**it, "origin": o, "dest": d, "date": date, "url": url})
+    def route_row(kind, o, d, date, url, its):
+        results["routes"].append({"kind": kind, "origin": o, "dest": d, "date": date, "url": url,
+                                  "ok": its is not None, "count": len(its or []),
+                                  "cheapest": its[0]["price"] if its else None})
 
-    # 2. Self-built stopover: Ireland -> hub (direct), hub -> Thailand (direct), separate tickets
-    leg2_cache = {}  # (hub, dest, date) -> (url, flights); shared by every departure date
+    def through(o, d, date):
+        url, its = search(o, d, date, tc["max_stops"])
+        if its:
+            its = [it for it in its if on_time(it)]
+        route_row("through", o, d, date, url, its)
+        for it in its or []:
+            results["through"].append({**it, "origin": o, "dest": d, "date": date, "url": url})
+
+    leg1_cache, leg2_cache = {}, {}  # shared by every departure date / pair in this run
+
+    def outward(hub, travel):
+        if (hub, travel) not in leg1_cache:
+            url1, leg1 = search(sc["origin"], hub, travel, sc["leg_max_stops"])
+            leg1_cache[(hub, travel)] = (url1, leg1)
+            route_row("leg1", sc["origin"], hub, travel, url1, leg1)
+        return leg1_cache[(hub, travel)]
 
     def onward(hub, dest, date2):
         if (hub, dest, date2) not in leg2_cache:
@@ -180,9 +211,7 @@ def run():
             if leg2:
                 leg2 = [it for it in leg2 if on_time(it)]
             leg2_cache[(hub, dest, date2)] = (url2, leg2)
-            results["routes"].append({"kind": "leg2", "origin": hub, "dest": dest, "date": date2,
-                                      "url": url2, "ok": leg2 is not None, "count": len(leg2 or []),
-                                      "cheapest": leg2[0]["price"] if leg2 else None})
+            route_row("leg2", hub, dest, date2, url2, leg2)
         return leg2_cache[(hub, dest, date2)]
 
     def combine(travel, hub, url1, leg1, dest, url2, leg2):
@@ -202,23 +231,49 @@ def run():
                     "leg1": {**a, "url": url1}, "leg2": {**b, "url": url2},
                 })
 
-    for travel in travel_dates:
-        base = datetime.strptime(travel, "%Y-%m-%d")
-        for hub in sc["hubs"]:
-            url1, leg1 = search(sc["origin"], hub, travel, sc["leg_max_stops"])
-            results["routes"].append({"kind": "leg1", "origin": sc["origin"], "dest": hub, "date": travel,
-                                      "url": url1, "ok": leg1 is not None, "count": len(leg1 or []),
-                                      "cheapest": leg1[0]["price"] if leg1 else None})
-            if not leg1:
-                continue  # no direct flight to this hub on the day; skip its onward searches
-            for dest in sc["destinations"]:
-                for extra in range(sc["max_extra_days"] + 2):  # +1: overnight arrivals land the next day
-                    day2 = base + timedelta(days=extra)
-                    if arrive_by and day2.date() > arrive_by.date():
-                        break  # anything leaving the hub later lands too late
-                    date2 = day2.strftime("%Y-%m-%d")
-                    url2, leg2 = onward(hub, dest, date2)
-                    combine(travel, hub, url1, leg1, dest, url2, leg2)
+    if mode == "full":
+        # 1. Through-tickets (one ticket, direct or one stop); compare dates from Dublin only
+        for date in travel_dates + CONFIG["compare_dates"]:
+            for o in (tc["origins"] if date in travel_dates else ["DUB"]):
+                for d in tc["destinations"]:
+                    through(o, d, date)
+        # 2. Self-built stopover: Ireland -> hub (direct), hub -> Thailand (direct), separate tickets
+        for travel in travel_dates:
+            base = datetime.strptime(travel, "%Y-%m-%d")
+            for hub in sc["hubs"]:
+                url1, leg1 = outward(hub, travel)
+                if not leg1:
+                    continue  # no direct flight to this hub on the day; skip its onward searches
+                for dest in sc["destinations"]:
+                    for extra in range(sc["max_extra_days"] + 2):  # +1: overnight arrivals land the next day
+                        day2 = base + timedelta(days=extra)
+                        if arrive_by and day2.date() > arrive_by.date():
+                            break  # anything leaving the hub later lands too late
+                        date2 = day2.strftime("%Y-%m-%d")
+                        url2, leg2 = onward(hub, dest, date2)
+                        combine(travel, hub, url1, leg1, dest, url2, leg2)
+    else:
+        # Quick check: re-search only the watched routes; everything else stays as the last full search left it
+        th_keys = {(w["origin"], w["dest"], w["date"]) for w in watch if w["type"] == "through"}
+        so_keys = {(w["date"], w["hub"], w["dest"], w["date2"]) for w in watch if w["type"] == "stopover"}
+        leg1_keys = {(sc["origin"], w["hub"], w["date"]) for w in watch if w["type"] == "stopover"}
+        leg2_keys = {(w["hub"], w["dest"], w["date2"]) for w in watch if w["type"] == "stopover"}
+        old = prev["results"]
+        results["through"] = [t for t in old["through"] if (t["origin"], t["dest"], t["date"]) not in th_keys]
+        results["stopover"] = [s for s in old["stopover"]
+                               if (s["date"], s["hub"], s["dest"], s["leg2"]["legs"][0]["dep"][:10]) not in so_keys]
+        results["routes"] = [r for r in old["routes"] if not (
+            (r["kind"] == "through" and (r["origin"], r["dest"], r["date"]) in th_keys)
+            or (r["kind"] == "leg1" and (r["origin"], r["dest"], r["date"]) in leg1_keys)
+            or (r["kind"] == "leg2" and (r["origin"], r["dest"], r["date"]) in leg2_keys))]
+        for w in watch:
+            if w["type"] == "through":
+                through(w["origin"], w["dest"], w["date"])
+            else:
+                url1, leg1 = outward(w["hub"], w["date"])
+                url2, leg2 = onward(w["hub"], w["dest"], w["date2"])
+                if leg1:
+                    combine(w["date"], w["hub"], url1, leg1, w["dest"], url2, leg2)
 
     results["through"].sort(key=lambda x: x["price"])
     # For each date/hub/dest/nights keep the cheapest five combos so the file stays small
@@ -235,6 +290,10 @@ def run():
     meta = {
         "started": started.isoformat(timespec="seconds"),
         "finished": finished.isoformat(timespec="seconds"),
+        "mode": mode,
+        "last_full": finished.isoformat(timespec="seconds") if mode == "full"
+                     else prev["meta"].get("last_full", prev["meta"]["finished"]),
+        "watchlist": pick_watchlist(results, travel_dates) if mode == "full" else watch,
         "queries": query_count,
         "errors": errors,
         "target_eur": CONFIG["target_eur"],
@@ -304,7 +363,7 @@ def write(meta, results):
             for r in results["routes"]:
                 if r["cheapest"] is not None:
                     w.writerow([ts, r["kind"], f"{r['origin']}-{r['dest']} {r['date']}", r["cheapest"]])
-        log(f"ok {meta['queries']} queries, {len(meta['errors'])} errors, "
+        log(f"ok {meta['mode']} {meta['queries']} queries, {len(meta['errors'])} errors, "
             f"best through {best_t['price'] if best_t else 'none'}, best stopover {best_s['price'] if best_s else 'none'}")
         update_daily_low(meta, results, through_tr)
 
@@ -323,7 +382,7 @@ def write(meta, results):
 
 if __name__ == "__main__":
     try:
-        m, r = run()
+        m, r = run("quick" if "--quick" in sys.argv else "full")
         write(m, r)
     except Exception:
         traceback.print_exc()
