@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: "7 * * * *"   # every hour at :07 (GitHub can run a few minutes late)
   workflow_dispatch:       # "Run workflow" button for a manual update
+  push:                    # code or config changes run a sweep straight away
+    branches: [main]
+    paths-ignore: ["data/**", "dashboard/data.js"]
 
 permissions:
   contents: write
