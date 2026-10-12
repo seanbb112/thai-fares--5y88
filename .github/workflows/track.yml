@@ -35,7 +35,9 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Search Google Flights
-        run: python tracker/tracker.py
+        run: |
+          set -o pipefail
+          python tracker/tracker.py 2>&1 | tail -n 40 > data/ci-output.log
         continue-on-error: true   # a failed sweep still saves its log and keeps the last good page up
 
       - name: Save price history
