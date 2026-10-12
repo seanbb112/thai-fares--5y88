@@ -92,12 +92,33 @@ a { color: var(--s1); }
 .critbox { border-left: 3px solid var(--crit); }
 ul.notes { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); }
 .empty { color: var(--muted); padding: 12px 0; }
-a.tile.link { display: block; color: inherit; text-decoration: none; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
-a.tile.link:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255, 61, 119, 0.18); }
+.tile.link { display: block; color: inherit; text-decoration: none; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.tile.link:hover, .tile.link:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255, 61, 119, 0.18); }
 .tile .cta { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--a2); }
 .tile .cta2 { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
 .tile .cta2 a, a.btn { display: inline-block; font-size: 12px; font-weight: 700; text-decoration: none; color: #fff; background: linear-gradient(90deg, #ff7a18, #ff3d77); border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
 .go { cursor: pointer; }
+.tile .mapcta { font-size: 12px; font-weight: 700; color: var(--ink); background: var(--page); border: 1px solid var(--ring); border-radius: 999px; padding: 4px 12px; }
+dialog#trip { border: 0; padding: 0; background: transparent; max-width: 760px; width: calc(100% - 24px); max-height: calc(100% - 24px); }
+dialog#trip::backdrop { background: rgba(13, 13, 13, 0.55); backdrop-filter: blur(2px); }
+.sheet { background: var(--surface); color: var(--ink); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+.sheethead { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 18px 18px 12px; background: var(--hero); color: #fff; }
+.sheethead h2::before { display: none; }
+.sheethead .sub { color: rgba(255,255,255,0.92); }
+.sheethead button { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.4); color: #fff; }
+#tripMap { height: 320px; background: var(--page); }
+.timeline { list-style: none; margin: 0; padding: 14px 18px 4px; }
+.timeline li { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+.timeline .tdot { width: 14px; height: 14px; border-radius: 50%; flex: none; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--axis); }
+.timeline .tbody { flex: 1; min-width: 0; }
+.timeline .tcity { font-weight: 700; }
+.timeline .stay { font-weight: 800; font-size: 15px; white-space: nowrap; background: rgba(255, 179, 0, 0.18); border-radius: 999px; padding: 3px 10px; }
+.timeline .tflight { padding: 0 0 0 5px; }
+.timeline .tline { width: 4px; height: 26px; border-radius: 2px; flex: none; margin-right: 9px; }
+.tripbook { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 18px 18px; }
+a.btn.big { font-size: 14px; padding: 9px 16px; }
+.maptip { font: 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; border-radius: 8px; }
+@media (max-width: 640px) { dialog#trip { width: 100%; max-width: 100%; max-height: 100%; margin: auto 0 0; } .sheet { border-radius: 20px 20px 0 0; } #tripMap { height: 260px; } }
 .gulf { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 600; color: var(--ink); background: rgba(250, 178, 25, 0.22); border: 1px solid rgba(250, 178, 25, 0.6); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 @media (max-width: 640px) {
   main { padding: 12px 12px 48px; }
@@ -186,6 +207,17 @@ a.tile.link:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(25
     </ul>
   </section>
 </main>
+<dialog id="trip" aria-labelledby="tripTitle">
+  <div class="sheet">
+    <div class="sheethead">
+      <div><h2 id="tripTitle" style="margin:0"></h2><p class="sub" id="tripSub"></p></div>
+      <button id="tripClose" aria-label="Close">✕</button>
+    </div>
+    <div id="tripMap"></div>
+    <ol id="tripList" class="timeline"></ol>
+    <div id="tripBook" class="tripbook"></div>
+  </div>
+</dialog>
 <script src="data.js"></script>
 <script>
 (function () {
@@ -242,33 +274,187 @@ a.tile.link:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(25
   const bookOf = (it) => it && (it.book_url || it.url);
   const soLinks = (s) => s && [bookOf(s.leg1), bookOf(s.leg2)];
   const tiles = [];
+  const thTrip = (t) => t && { kind: "through", price: t.price, date: t.date, parts: [{ it: t, book: bookOf(t), label: "Book this flight" }] };
+  const soTrip = (s) => s && { kind: "stopover", price: s.price, date: s.date, hub: s.hub, parts: [
+    { it: s.leg1, book: bookOf(s.leg1), label: "Book flight 1" }, { it: s.leg2, book: bookOf(s.leg2), label: "Book flight 2" }] };
   tdates.forEach(d => {
     const t = firstOn(results.through, d);
-    tiles.push({ label: `Cheapest through-ticket, leave ${short(d)}`, v: t && t.price, d: t ? `${routeStr(t)} · ${t.airlines.join(", ")}` : "None found", g: gulfIn(t), href: bookOf(t) });
+    tiles.push({ label: `Cheapest through-ticket, leave ${short(d)}`, v: t && t.price, d: t ? `${routeStr(t)} · ${t.airlines.join(", ")}` : "None found", g: gulfIn(t), trip: thTrip(t) });
   });
   tdates.forEach(d => {
     const s = firstOn(results.stopover, d);
-    tiles.push({ label: `Cheapest stopover, leave ${short(d)}`, v: s && s.price, d: s ? `via ${s.hub}, ${s.nights} night${s.nights===1?"":"s"} · to ${s.dest} · two bookings` : "None found", g: s && gulfIn(s.leg1, s.leg2), legs: soLinks(s) });
+    tiles.push({ label: `Cheapest stopover, leave ${short(d)}`, v: s && s.price, d: s ? `via ${s.hub}, ${s.nights} night${s.nights===1?"":"s"} · to ${s.dest} · two bookings` : "None found", g: s && gulfIn(s.leg1, s.leg2), trip: soTrip(s) });
   });
   const safeT = thTravel.find(t => !gulfIn(t));
   const safeS = results.stopover.find(s => !gulfIn(s.leg1, s.leg2));
   const safe = [safeT, safeS].filter(Boolean).sort((a, b) => a.price - b.price)[0];
   tiles.push({ label: "Cheapest avoiding the Gulf, either date", v: safe && safe.price,
     d: !safe ? "None found" : safe.hub ? `Stopover via ${safe.hub}, ${safe.nights} nights · leave ${short(safe.date || tdates[0])} · two bookings` : `${routeStr(safe)} · ${safe.airlines.join(", ")} · leave ${short(safe.date)}`,
-    href: safe && !safe.hub ? bookOf(safe) : null, legs: safe && safe.hub ? soLinks(safe) : null });
+    trip: safe && (safe.hub ? soTrip(safe) : thTrip(safe)) });
   const saving = (bestT && bestS) ? bestT.price - bestS.price : null;
   tiles.push(saving == null || saving > 0
     ? { label: "Saving from a stopover", v: saving, d: "Cheapest through-ticket minus cheapest stopover, before hotel and bags", raw: true }
     : { label: "Saving from a stopover", v: null, text: "None", d: `The cheapest stopover is ${eur(-saving)} dearer than the cheapest through-ticket`, raw: true });
-  if (bestO) tiles.push({ label: `Cheapest through-ticket, ${short(bestO.date)} (old plan date)`, v: bestO.price, d: `${routeStr(bestO)} · ${bestO.airlines.join(", ")}`, href: bookOf(bestO) });
-  $("#tiles").innerHTML = tiles.map(t => {
+  if (bestO) tiles.push({ label: `Cheapest through-ticket, ${short(bestO.date)} (old plan date)`, v: bestO.price, d: `${routeStr(bestO)} · ${bestO.airlines.join(", ")}`, trip: thTrip(bestO) });
+  $("#tiles").innerHTML = tiles.map((t, i) => {
     const body = `<div class="label">${t.label}</div>
       <div class="value">${t.text || (t.v == null ? "—" : eur(t.v))}</div>
       <div class="detail">${esc(t.d)}</div>${t.g ? gulfTag : ""}${t.raw ? "" : "<div>" + statusOf(t.v) + "</div>"}`;
-    if (t.href) return `<a class="tile link" href="${t.href}" target="_blank" rel="noopener">${body}<div class="cta">Book this flight →</div></a>`;
-    if (t.legs) return `<div class="tile">${body}<div class="cta2"><a href="${t.legs[0]}" target="_blank" rel="noopener">Book leg 1 →</a><a href="${t.legs[1]}" target="_blank" rel="noopener">Book leg 2 →</a></div></div>`;
-    return `<div class="tile">${body}</div>`;
+    if (!t.trip) return `<div class="tile">${body}</div>`;
+    const books = t.trip.parts.map(p => `<a href="${p.book}" target="_blank" rel="noopener">${p.label} →</a>`).join("");
+    return `<div class="tile link" data-trip="${i}" role="button" tabindex="0">${body}<div class="cta2"><span class="mapcta">🗺 Route map</span>${books}</div></div>`;
   }).join("");
+  $("#tiles").addEventListener("click", (e) => {
+    if (e.target.closest("a")) return;
+    const el = e.target.closest("[data-trip]");
+    if (el) openTrip(tiles[+el.dataset.trip].trip);
+  });
+  $("#tiles").addEventListener("keydown", (e) => {
+    const el = e.target.closest("[data-trip]");
+    if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTrip(tiles[+el.dataset.trip].trip); }
+  });
+
+  // ---------- trip panel: route map + time spent in each city ----------
+  // [lat, lon, city] for airports the search can touch; unknown codes still list, just not on the map
+  const AP = {
+    DUB:[53.421,-6.270,"Dublin"], ORK:[51.841,-8.491,"Cork"], SNN:[52.702,-8.925,"Shannon"],
+    BKK:[13.690,100.750,"Bangkok"], DMK:[13.913,100.607,"Bangkok Don Mueang"], HKT:[8.113,98.317,"Phuket"],
+    CNX:[18.767,98.963,"Chiang Mai"], KBV:[8.099,98.986,"Krabi"], USM:[9.548,100.062,"Koh Samui"],
+    LHR:[51.470,-0.454,"London Heathrow"], LGW:[51.154,-0.182,"London Gatwick"], STN:[51.885,0.235,"London Stansted"],
+    LTN:[51.875,-0.368,"London Luton"], MAN:[53.354,-2.275,"Manchester"], EDI:[55.950,-3.373,"Edinburgh"], BHX:[52.454,-1.748,"Birmingham"],
+    AMS:[52.311,4.768,"Amsterdam"], CDG:[49.010,2.548,"Paris"], ORY:[48.723,2.379,"Paris Orly"], BRU:[50.901,4.484,"Brussels"],
+    FRA:[50.038,8.562,"Frankfurt"], MUC:[48.354,11.775,"Munich"], DUS:[51.290,6.767,"Düsseldorf"], ZRH:[47.458,8.556,"Zurich"],
+    GVA:[46.238,6.109,"Geneva"], VIE:[48.110,16.570,"Vienna"], CPH:[55.618,12.651,"Copenhagen"], ARN:[59.650,17.924,"Stockholm"],
+    OSL:[60.198,11.100,"Oslo"], HEL:[60.317,24.963,"Helsinki"], WAW:[52.166,20.967,"Warsaw"], KRK:[50.078,19.785,"Kraków"],
+    PRG:[50.101,14.260,"Prague"], BUD:[47.437,19.256,"Budapest"], MXP:[45.631,8.728,"Milan"], FCO:[41.800,12.239,"Rome"],
+    BCN:[41.297,2.083,"Barcelona"], MAD:[40.498,-3.568,"Madrid"], LIS:[38.774,-9.134,"Lisbon"], ATH:[37.936,23.945,"Athens"],
+    IST:[41.275,28.752,"Istanbul"], SAW:[40.899,29.309,"Istanbul Sabiha Gökçen"],
+    DXB:[25.253,55.366,"Dubai"], AUH:[24.433,54.651,"Abu Dhabi"], SHJ:[25.329,55.517,"Sharjah"], DOH:[25.273,51.608,"Doha"],
+    KWI:[29.227,47.969,"Kuwait"], BAH:[26.271,50.634,"Bahrain"], RUH:[24.958,46.699,"Riyadh"], JED:[21.680,39.157,"Jeddah"],
+    MCT:[23.593,58.284,"Muscat"], DEL:[28.556,77.100,"Delhi"], BOM:[19.090,72.866,"Mumbai"], CMB:[7.181,79.884,"Colombo"],
+    MLE:[4.192,73.529,"Malé"], TAS:[41.258,69.281,"Tashkent"], ALA:[43.352,77.041,"Almaty"], ASB:[37.987,58.361,"Ashgabat"],
+    PEK:[40.080,116.603,"Beijing"], PKX:[39.510,116.411,"Beijing Daxing"], PVG:[31.144,121.808,"Shanghai"], CAN:[23.392,113.299,"Guangzhou"],
+    SZX:[22.639,113.811,"Shenzhen"], CTU:[30.579,103.947,"Chengdu"], TFU:[30.313,104.444,"Chengdu Tianfu"], KMG:[25.102,102.929,"Kunming"],
+    XMN:[24.544,118.128,"Xiamen"], CKG:[29.719,106.642,"Chongqing"], HKG:[22.308,113.919,"Hong Kong"], ICN:[37.460,126.441,"Seoul"],
+    NRT:[35.772,140.393,"Tokyo"], KUL:[2.746,101.707,"Kuala Lumpur"], SIN:[1.364,103.992,"Singapore"], HAN:[21.221,105.807,"Hanoi"],
+    SGN:[10.819,106.652,"Ho Chi Minh City"],
+  };
+  const city = (c) => AP[c] ? AP[c][2] : c;
+  const mins = (a, b) => (new Date(b) - new Date(a)) / 60000;   // both times local to the same airport
+  const stayText = (m, arr, dep) => {
+    const nights = Math.round((new Date(dep.slice(0,10)) - new Date(arr.slice(0,10))) / 86400000);
+    if (m < 24 * 60) return { big: dur(Math.round(m)), small: nights ? "overnight connection" : "connection" };
+    const d = Math.floor(m / 1440), h = Math.round((m % 1440) / 60);
+    return { big: `${d} day${d === 1 ? "" : "s"}${h ? " " + h + "h" : ""}`, small: `${nights} night${nights === 1 ? "" : "s"}` };
+  };
+
+  function tripStops(trip) {
+    // flatten every flight, remembering which booking it belongs to
+    const flights = trip.parts.flatMap((p, bi) => p.it.legs.map(l => ({ ...l, booking: bi })));
+    const stops = [{ code: flights[0].from, kind: "start", dep: flights[0].dep }];
+    flights.forEach((l, i) => {
+      const next = flights[i + 1];
+      if (!next) { stops.push({ code: l.to, kind: "end", arr: l.arr }); return; }
+      stops.push({ code: l.to, kind: next.booking !== l.booking ? "stopover" : "connection", arr: l.arr, dep: next.dep,
+        selfTransfer: next.booking !== l.booking, changeAirport: next.from !== l.to, nextFrom: next.from });
+    });
+    return { flights, stops };
+  }
+
+  let leafletReady = null, map = null, mapLayer = null;
+  function loadLeaflet() {
+    if (!leafletReady) leafletReady = new Promise((ok, fail) => {
+      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
+      const js = document.createElement("script"); js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.onload = ok; js.onerror = fail; document.head.appendChild(js);
+    });
+    return leafletReady;
+  }
+  // great-circle path so long-haul legs curve like real routes
+  function arc(a, b, n = 48) {
+    const r = Math.PI / 180, [la1, lo1, la2, lo2] = [a[0]*r, a[1]*r, b[0]*r, b[1]*r];
+    const d = 2 * Math.asin(Math.sqrt(Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2));
+    if (!d) return [a, b];
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const f = i / n, A = Math.sin((1-f)*d) / Math.sin(d), B = Math.sin(f*d) / Math.sin(d);
+      const x = A*Math.cos(la1)*Math.cos(lo1) + B*Math.cos(la2)*Math.cos(lo2), y = A*Math.cos(la1)*Math.sin(lo1) + B*Math.cos(la2)*Math.sin(lo2), z = A*Math.sin(la1) + B*Math.sin(la2);
+      pts.push([Math.atan2(z, Math.hypot(x, y)) / r, Math.atan2(y, x) / r]);
+    }
+    return pts;
+  }
+  const isDark = () => (document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
+  const BOOKING_COL = ["#ff3d77", "#7b3cff"];
+
+  async function drawMap(trip, info) {
+    const box = $("#tripMap");
+    try { await loadLeaflet(); } catch (e) { box.innerHTML = `<div class="empty" style="padding:16px">Map couldn't load (offline?). The route is listed below.</div>`; return; }
+    if (!map) {
+      map = L.map(box, { zoomControl: true, attributionControl: true, worldCopyJump: true });
+      map._tiles = null;
+    }
+    if (map._tiles) map.removeLayer(map._tiles);
+    // Esri basemaps need no API key
+    map._tiles = L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/${isDark() ? "Canvas/World_Dark_Gray_Base" : "World_Street_Map"}/MapServer/tile/{z}/{y}/{x}`,
+      { attribution: "Tiles &copy; Esri", maxZoom: 16 }).addTo(map);
+    if (mapLayer) map.removeLayer(mapLayer);
+    mapLayer = L.layerGroup().addTo(map);
+    const pts = [];
+    info.flights.forEach(l => {
+      const a = AP[l.from], b = AP[l.to];
+      if (!a || !b) return;
+      L.polyline(arc(a, b), { color: BOOKING_COL[l.booking], weight: 3, opacity: 0.9, dashArray: trip.kind === "stopover" && l.booking ? "8 6" : null }).addTo(mapLayer);
+      pts.push(a, b);
+    });
+    info.stops.forEach((s, i) => {
+      const p = AP[s.code]; if (!p) return;
+      const stay = s.arr && s.dep ? stayText(mins(s.arr, s.dep), s.arr, s.dep).big : (s.kind === "start" ? "Start" : "Arrive");
+      const col = s.kind === "stopover" ? "#ffb300" : s.kind === "end" ? "#00b894" : s.kind === "start" ? "#00a8ff" : "#ffffff";
+      L.circleMarker(p, { radius: s.kind === "connection" ? 6 : 9, color: "#1a1a19", weight: 2, fillColor: col, fillOpacity: 1 }).addTo(mapLayer)
+        .bindTooltip(`<b>${esc(city(s.code))}</b><br>${stay}`, { permanent: true, direction: i % 2 ? "bottom" : "top", offset: [0, i % 2 ? 8 : -8], className: "maptip" });
+    });
+    setTimeout(() => { map.invalidateSize(); if (pts.length) map.fitBounds(pts, { paddingTopLeft: [60, 60], paddingBottomRight: [60, 50] }); }, 60);
+  }
+
+  function openTrip(trip) {
+    if (!trip) return;
+    const info = tripStops(trip);
+    const first = info.flights[0], last = info.flights.at(-1);
+    $("#tripTitle").textContent = `${city(first.from)} → ${city(last.to)} · ${eur(trip.price)}`;
+    $("#tripSub").textContent = `Leave ${dt(first.dep)} · land ${dt(last.arr)} (local times) · ${trip.kind === "stopover" ? "two separate bookings" : "one booking"}`;
+    const rows = info.stops.map(s => {
+      const dot = s.kind === "stopover" ? "#ffb300" : s.kind === "end" ? "#00b894" : s.kind === "start" ? "#00a8ff" : "var(--axis)";
+      let what, when, stay = "";
+      if (s.kind === "start") { what = "Depart"; when = dt(s.dep); }
+      else if (s.kind === "end") { what = "Arrive in Thailand 🌴"; when = dt(s.arr); }
+      else {
+        const st = stayText(mins(s.arr, s.dep), s.arr, s.dep);
+        what = s.kind !== "stopover" ? `Change planes · ${st.small}` : mins(s.arr, s.dep) < 1440 ? "Self-transfer, separate tickets" : `Stopover · ${st.small}`;
+        when = `${dt(s.arr)} → ${dt(s.dep)}`;
+        stay = `<div class="stay">${st.big}</div>`;
+        if (s.changeAirport) what += ` · leave from ${s.nextFrom}`;
+      }
+      return `<li><span class="tdot" style="background:${dot}"></span><div class="tbody"><div class="tcity">${esc(city(s.code))} <span class="muted">${s.code}</span></div>
+        <div class="small">${what} · ${when}</div></div>${stay}</li>`;
+    });
+    // put the flight between each pair of stops
+    const items = [];
+    info.stops.forEach((s, i) => {
+      items.push(rows[i]);
+      const l = info.flights[i];
+      if (l) items.push(`<li class="tflight"><span class="tline" style="background:${BOOKING_COL[l.booking]}"></span><div class="small">✈ ${l.flight} · ${esc(l.carrier)} · ${dur(l.minutes)}${trip.kind === "stopover" ? ` · booking ${l.booking + 1}` : ""}</div></li>`);
+    });
+    $("#tripList").innerHTML = items.join("");
+    const gulf = trip.parts.some(p => gulfIn(p.it));
+    $("#tripBook").innerHTML = (gulf ? gulfTag : "") + trip.parts.map(p => `<a class="btn big" href="${p.book}" target="_blank" rel="noopener">${p.label} · ${eur(p.it.price)} →</a>`).join("");
+    const dlg = $("#trip");
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+    drawMap(trip, info);
+  }
+  $("#tripClose").onclick = () => $("#trip").close();
+  // #trip0, #trip1 … opens that card's panel directly (handy for a home-screen shortcut)
+  const hashTrip = location.hash.match(/^#trip(\d+)$/);
+  if (hashTrip && tiles[+hashTrip[1]]) openTrip(tiles[+hashTrip[1]].trip);
+  $("#trip").addEventListener("click", (e) => { if (e.target.id === "trip") $("#trip").close(); });
 
   // chart
   function drawChart() {
