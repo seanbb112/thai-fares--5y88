@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en-IE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="600">
+<title>Thailand Flight Tracker</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834;
+  --good: #0ca30c; --good-text: #006300; --warn: #fab219; --crit: #d03b3b;
+  --seq-0: #f0efec; --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #5598e7; --seq-4: #256abf; --seq-5: #104281;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --good-text: #0ca30c;
+    --seq-0: #383835; --seq-1: #184f95; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #9ec5f4;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --good-text: #0ca30c;
+  --seq-0: #383835; --seq-1: #184f95; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #9ec5f4;
+}
+:root {
+  --hero: linear-gradient(120deg, #ff7a18 0%, #ff3d77 45%, #7b3cff 100%);
+  --bg: radial-gradient(1200px 600px at 0% 0%, #fff1e0 0%, transparent 60%), radial-gradient(1000px 600px at 100% 0%, #e6f4ff 0%, transparent 60%), #fffaf5;
+  --a1: #ff7a18; --a2: #ff3d77; --a3: #00b894; --a4: #7b3cff; --a5: #00a8ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: radial-gradient(1200px 600px at 0% 0%, #3a1d0a 0%, transparent 60%), radial-gradient(1000px 600px at 100% 0%, #0d2440 0%, transparent 60%), #0d0d0d; }
+}
+:root[data-theme="dark"] { --bg: radial-gradient(1200px 600px at 0% 0%, #3a1d0a 0%, transparent 60%), radial-gradient(1000px 600px at 100% 0%, #0d2440 0%, transparent 60%), #0d0d0d; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); background-attachment: fixed; color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+h2 { font-size: 16px; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+h2::before { content: ""; width: 6px; height: 20px; border-radius: 3px; background: var(--accent, var(--a2)); }
+.sub { color: var(--ink-2); margin: 0; }
+.muted { color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 16px; padding: 18px; margin-top: 18px; box-shadow: 0 6px 24px rgba(255, 61, 119, 0.06); }
+.card:nth-of-type(1) { --accent: var(--a5); } .card:nth-of-type(2) { --accent: var(--a1); } .card:nth-of-type(3) { --accent: var(--a2); }
+.card:nth-of-type(4) { --accent: var(--a4); } .card:nth-of-type(5) { --accent: var(--a3); } .card:nth-of-type(6) { --accent: #fab219; }
+.head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-end;
+  background: var(--hero); color: #fff; border-radius: 20px; padding: 26px 24px; box-shadow: 0 12px 40px rgba(255, 61, 119, 0.28); }
+.head .sub { color: rgba(255,255,255,0.92); }
+.head .pill { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.35); color: #fff; backdrop-filter: blur(4px); }
+.head button { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.35); color: #fff; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--ring); font-size: 12px; color: var(--ink-2); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px rgba(255,255,255,0.6); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 18px; }
+.tile { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--ring); border-radius: 16px; padding: 18px 18px 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
+.tile::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; background: var(--tc); }
+.tile::after { content: ""; position: absolute; right: -40px; top: -40px; width: 120px; height: 120px; border-radius: 50%; background: var(--tc); opacity: 0.10; }
+.tile:nth-child(1) { --tc: linear-gradient(90deg, #00a8ff, #2a78d6); } .tile:nth-child(2) { --tc: linear-gradient(90deg, #ff7a18, #ff3d77); }
+.tile:nth-child(3) { --tc: linear-gradient(90deg, #00a8ff, #7b3cff); } .tile:nth-child(4) { --tc: linear-gradient(90deg, #ffb300, #ff7a18); }
+.tile:nth-child(5) { --tc: linear-gradient(90deg, #00b894, #0ca30c); } .tile:nth-child(6) { --tc: linear-gradient(90deg, #7b3cff, #e87ba4); }
+.tile .label { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+.tile .value { font-size: 34px; font-weight: 700; margin: 4px 0; letter-spacing: -0.02em; }
+.tile .detail { color: var(--ink-2); font-size: 12px; }
+.status { font-size: 12px; font-weight: 600; display: inline-flex; gap: 4px; align-items: center; }
+.ok { color: var(--good-text); } .over { color: var(--ink-2); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+select, button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 999px; padding: 5px 12px; }
+select:focus, button:focus-visible { outline: 2px solid var(--a2); outline-offset: 1px; }
+tr:hover td { background: rgba(255, 122, 24, 0.06); }
+.matrix tr:hover td { background: revert; }
+button { cursor: pointer; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .small { color: var(--ink-2); font-size: 12px; }
+a { color: var(--s1); }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: 260px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; white-space: nowrap; }
+.matrix td.cell { text-align: center; font-variant-numeric: tabular-nums; border: 2px solid var(--surface); border-radius: 4px; min-width: 64px; }
+.warnbox { border-left: 3px solid var(--warn); padding: 8px 12px; margin-top: 12px; background: var(--surface); border-radius: 6px; font-size: 13px; }
+.critbox { border-left: 3px solid var(--crit); }
+ul.notes { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); }
+.empty { color: var(--muted); padding: 12px 0; }
+.gulf { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 600; color: var(--ink); background: rgba(250, 178, 25, 0.22); border: 1px solid rgba(250, 178, 25, 0.6); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+@media (max-width: 640px) {
+  main { padding: 12px 12px 48px; }
+  .head { padding: 20px 16px; } h1 { font-size: 21px; }
+  .stack tr:first-child { display: none; }
+  .stack tr { display: block; border-bottom: 1px solid var(--grid); padding: 10px 0; }
+  .stack td { display: flex; justify-content: space-between; gap: 14px; border: 0; padding: 3px 0; text-align: right; }
+  .stack td.num { justify-content: space-between; }
+  .stack td::before { content: attr(data-l); color: var(--muted); font-weight: 600; text-align: left; flex: none; }
+  .stack td > .v { text-align: right; min-width: 0; }
+  .stack td.empty::before { content: none; }
+}
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <div>
+      <h1>✈ Ireland → Thailand 🌴 · 27 or 28/12/26 · one-way</h1>
+      <p class="sub">Google Flights, 1 adult, economy, direct or one stop. Target around €<span id="target">500</span>.<span id="arriveBy"></span></p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="pill" id="updated">Loading…</span>
+      <button id="theme" title="Toggle light/dark">◐</button>
+    </div>
+  </div>
+  <div id="alerts"></div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <h2>Cheapest price over time</h2>
+    <p class="sub">Best fare found on each hourly run. The dashed line is your €500 target.</p>
+    <div class="chart" id="chart"><svg></svg><div class="tip"></div></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--s1)"></span>Through-ticket (one booking)</span>
+      <span><span class="swatch" style="background:var(--s2)"></span>Stopover (two bookings)</span>
+      <span><span class="swatch" style="background:var(--muted)"></span>€500 target</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Stopover options: cheapest total by hub and nights at the hub</h2>
+    <p class="sub">Direct Dublin → hub on the departure date, then direct hub → Thailand. Darker cells are cheaper. "0" is a same-day connection on separate tickets (at least 3 hours).</p>
+    <div class="filters"><label>Leave Dublin <select id="mxDate"></select></label><label>Destination <select id="mxDest"></select></label></div>
+    <div class="tablewrap"><table class="matrix" id="matrix"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Stopover combinations</h2>
+    <div class="filters">
+      <label>Leave Dublin <select id="soDate"><option value="">Any</option></select></label>
+      <label>Hub <select id="soHub"><option value="">All</option></select></label>
+      <label>Nights <select id="soNights"><option value="">All</option></select></label>
+      <label>Destination <select id="soDest"><option value="">All</option></select></label>
+    </div>
+    <div class="tablewrap"><table id="soTable" class="stack"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Through-tickets (one booking)</h2>
+    <div class="filters">
+      <label>From <select id="thOrigin"><option value="">All</option></select></label>
+      <label>To <select id="thDest"><option value="">All</option></select></label>
+      <label>Date <select id="thDate"></select></label>
+    </div>
+    <div class="tablewrap"><table id="thTable" class="stack"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Every route searched this run</h2>
+    <p class="sub">Cheapest fare per search. "No direct" means Google showed no flight that matched.</p>
+    <div class="tablewrap"><table id="routes" class="stack"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Before you book</h2>
+    <ul class="notes">
+      <li>Prices come from Google Flights at the time of each run. Confirm on the airline's site before paying.</li>
+      <li>A stopover is two separate tickets. If the first flight is late and you miss the second, the second airline has no duty to rebook you. Leave at least one night, or a long gap.</li>
+      <li>Budget carriers on the second leg often exclude checked bags, so add the bag price before comparing.</li>
+      <li><b>Gulf routes (Dubai, Abu Dhabi, Doha, Sharjah, Kuwait, Bahrain, Saudi):</b> research on 12/10/26 found the DFA advising against non-essential travel to these countries and EASA airspace advice running to 16/11/26. Read the current advice at ireland.ie/dfa before booking anything marked ⚠.</li>
+      <li>China visa-free entry for Irish passports was reported to end 31/12/26. Check before a Beijing or Shanghai stopover that runs into January.</li>
+      <li>Check visa and transit rules for the stopover country on an Irish passport, and Thailand's digital arrival card (TDAC).</li>
+      <li>Hotel and food costs during a stopover are not included in the totals.</li>
+    </ul>
+  </section>
+</main>
+<script src="data.js"></script>
+<script>
+(function () {
+  const T = window.TRACKER;
+  const $ = (s) => document.querySelector(s);
+  const eur = (n) => n == null ? "—" : "€" + Math.round(n).toLocaleString("en-IE");
+  const ddmmyy = (iso) => { const d = new Date(iso); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(2); };
+  const hm = (iso) => iso.slice(11,16);
+  const dt = (iso) => iso.slice(8,10) + "/" + iso.slice(5,7) + " " + hm(iso);
+  const dur = (m) => m == null ? "" : Math.floor(m/60) + "h " + String(m%60).padStart(2,"0") + "m";
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  // theme toggle (per-viewer convenience only)
+  try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  $("#theme").onclick = () => {
+    const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("theme", next); } catch (e) {}
+    drawChart();
+  };
+
+  if (!T) { $("#updated").textContent = "No data yet: run tracker.py"; return; }
+  const { meta, results, history } = T;
+  const target = meta.target_eur;
+  $("#target").textContent = target;
+  if (meta.arrive_by) $("#arriveBy").textContent = ` Only flights landing in Thailand by ${meta.arrive_by.slice(8,10)}/${meta.arrive_by.slice(5,7)} are shown.`;
+
+  // freshness
+  const fin = new Date(meta.finished);
+  const ageMin = (Date.now() - fin) / 60000;
+  $("#updated").innerHTML = `<span class="dot" style="background:${ageMin < 90 ? "var(--good)" : "var(--warn)"}"></span>Updated ${ddmmyy(meta.finished)} ${meta.finished.slice(11,16)} · ${meta.queries} searches`;
+  const alerts = [];
+  if (ageMin > 90) alerts.push(`<div class="warnbox">⚠ Last successful update was ${Math.round(ageMin/60)} hours ago. Check that the hourly task is running and that the PC is on.</div>`);
+  if (meta.last_attempt_failed) alerts.push(`<div class="warnbox critbox">✖ The run at ${dt(meta.last_attempt_failed)} failed (Google may be rate-limiting). Showing the last good data.</div>`);
+  if (meta.errors && meta.errors.length) alerts.push(`<div class="warnbox">⚠ ${meta.errors.length} of ${meta.queries} searches failed this run. Those routes may be missing.</div>`);
+  $("#alerts").innerHTML = alerts.join("");
+
+  // tiles
+  const tdates = meta.travel_dates || [meta.travel_date];
+  const short = (d) => d.slice(8,10) + "/" + d.slice(5,7);
+  const firstOn = (arr, d) => arr.find(x => x.date === d);
+  const thTravel = results.through.filter(t => tdates.includes(t.date));
+  const bestT = thTravel[0], bestS = results.stopover[0], bestO = results.through.find(t => !tdates.includes(t.date));
+  const statusOf = (p) => p == null ? "" : p <= target * 1.1
+      ? `<span class="status ok">✔ Within 10% of target</span>`
+      : `<span class="status over">● ${eur(p - target)} above target</span>`;
+  const routeStr = (it) => it.legs.map(l => l.from).concat(it.legs.at(-1).to).join(" → ");
+  // Airports in countries under DFA "avoid non-essential travel" advice (as reported 12/10/26; check ireland.ie/dfa)
+  const GULF = new Set(["DXB", "DWC", "AUH", "SHJ", "DOH", "KWI", "BAH", "RUH", "JED", "DMM", "MED"]);
+  const gulfIn = (...its) => its.some(it => it && it.legs.some(l => GULF.has(l.from) || GULF.has(l.to)));
+  const gulfTag = `<span class="gulf" title="Travel via a Gulf country the DFA advises against for non-essential travel: check ireland.ie/dfa before booking">⚠ Gulf: check DFA advice</span>`;
+  const tiles = [];
+  tdates.forEach(d => {
+    const t = firstOn(results.through, d);
+    tiles.push({ label: `Cheapest through-ticket, leave ${short(d)}`, v: t && t.price, d: t ? `${routeStr(t)} · ${t.airlines.join(", ")}` : "None found", g: gulfIn(t) });
+  });
+  tdates.forEach(d => {
+    const s = firstOn(results.stopover, d);
+    tiles.push({ label: `Cheapest stopover, leave ${short(d)}`, v: s && s.price, d: s ? `via ${s.hub}, ${s.nights} night${s.nights===1?"":"s"} · to ${s.dest} · two bookings` : "None found", g: s && gulfIn(s.leg1, s.leg2) });
+  });
+  const safeT = thTravel.find(t => !gulfIn(t));
+  const safeS = results.stopover.find(s => !gulfIn(s.leg1, s.leg2));
+  const safe = [safeT, safeS].filter(Boolean).sort((a, b) => a.price - b.price)[0];
+  tiles.push({ label: "Cheapest avoiding the Gulf, either date", v: safe && safe.price,
+    d: !safe ? "None found" : safe.hub ? `Stopover via ${safe.hub}, ${safe.nights} nights · leave ${short(safe.date || tdates[0])} · two bookings` : `${routeStr(safe)} · ${safe.airlines.join(", ")} · leave ${short(safe.date)}` });
+  const saving = (bestT && bestS) ? bestT.price - bestS.price : null;
+  tiles.push(saving == null || saving > 0
+    ? { label: "Saving from a stopover", v: saving, d: "Cheapest through-ticket minus cheapest stopover, before hotel and bags", raw: true }
+    : { label: "Saving from a stopover", v: null, text: "None", d: `The cheapest stopover is ${eur(-saving)} dearer than the cheapest through-ticket`, raw: true });
+  if (bestO) tiles.push({ label: `Cheapest through-ticket, ${short(bestO.date)} (old plan date)`, v: bestO.price, d: `${routeStr(bestO)} · ${bestO.airlines.join(", ")}` });
+  $("#tiles").innerHTML = tiles.map(t => `<div class="tile"><div class="label">${t.label}</div>
+    <div class="value">${t.text || (t.v == null ? "—" : eur(t.v))}</div>
+    <div class="detail">${esc(t.d)}</div>${t.g ? gulfTag : ""}${t.raw ? "" : "<div>" + statusOf(t.v) + "</div>"}</div>`).join("");
+
+  // chart
+  function drawChart() {
+    const box = $("#chart"), svg = box.querySelector("svg"), tip = box.querySelector(".tip");
+    const runs = {};
+    history.filter(r => r.kind === "best").forEach(r => { (runs[r.run] ||= {})[r.key] = +r.price_eur; });
+    const xs = Object.keys(runs).sort();
+    const W = box.clientWidth || 800, H = 260, m = { l: 52, r: 16, t: 12, b: 28 };
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    if (!xs.length) { svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--muted)">No history yet</text>`; return; }
+    const vals = xs.flatMap(x => Object.values(runs[x])).concat([target]);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = Math.max(50, (hi - lo) * 0.15); lo = Math.max(0, Math.floor((lo - pad)/50)*50); hi = Math.ceil((hi + pad)/50)*50;
+    const X = (i) => m.l + (xs.length === 1 ? (W - m.l - m.r)/2 : i * (W - m.l - m.r) / (xs.length - 1));
+    const Y = (v) => m.t + (hi - v) * (H - m.t - m.b) / (hi - lo);
+    let g = "";
+    const step = Math.max(50, Math.ceil((hi - lo) / 5 / 50) * 50);
+    for (let v = lo; v <= hi; v += step) g += `<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">€${v}</text>`;
+    g += `<line x1="${m.l}" x2="${W-m.r}" y1="${Y(target)}" y2="${Y(target)}" stroke="var(--muted)" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+    const nt = Math.min(xs.length, Math.max(2, Math.floor((W - 80) / 110)));
+    for (let k = 0; k < nt; k++) { const i = xs.length === 1 ? 0 : Math.round(k * (xs.length - 1) / (nt - 1)); g += `<text x="${X(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)">${xs[i].slice(8,10)}/${xs[i].slice(5,7)} ${xs[i].slice(11,16)}</text>`; }
+    const series = [["through", "var(--s1)"], ["stopover", "var(--s2)"]];
+    series.forEach(([key, col]) => {
+      const pts = xs.map((x, i) => runs[x][key] != null ? [X(i), Y(runs[x][key])] : null).filter(Boolean);
+      if (pts.length > 1) g += `<polyline fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" points="${pts.map(p => p.join(",")).join(" ")}"/>`;
+      pts.forEach(p => g += `<circle cx="${p[0]}" cy="${p[1]}" r="${xs.length > 40 ? 0 : 4}" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`);
+    });
+    g += `<line id="xh" y1="${m.t}" y2="${H-m.b}" stroke="var(--axis)" visibility="hidden"/><rect x="${m.l}" y="0" width="${W-m.l-m.r}" height="${H}" fill="transparent" id="hit"/>`;
+    svg.innerHTML = g;
+    const hit = svg.querySelector("#hit"), xh = svg.querySelector("#xh");
+    hit.onmousemove = (e) => {
+      const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * W / r.width;
+      let i = 0, best = Infinity; xs.forEach((_, j) => { const d = Math.abs(X(j) - px); if (d < best) { best = d; i = j; } });
+      xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.setAttribute("visibility", "visible");
+      const run = runs[xs[i]];
+      tip.innerHTML = `<b>${ddmmyy(xs[i])} ${xs[i].slice(11,16)}</b><br><span class="swatch" style="background:var(--s1)"></span>Through-ticket ${eur(run.through)}<br><span class="swatch" style="background:var(--s2)"></span>Stopover ${eur(run.stopover)}`;
+      tip.style.display = "block";
+      const left = X(i) * r.width / W; tip.style.left = Math.min(left + 12, r.width - tip.offsetWidth - 4) + "px"; tip.style.top = "8px";
+    };
+    hit.onmouseleave = () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); };
+  }
+  drawChart(); addEventListener("resize", drawChart);
+
+  // phone layout: keep each cell's content in one box so it sits opposite its label
+  const wrapCells = (table) => table.querySelectorAll("td[data-l]").forEach(td => {
+    const v = document.createElement("div"); v.className = "v"; v.append(...td.childNodes); td.append(v);
+  });
+  new MutationObserver((muts) => muts.forEach(m => m.target.matches?.(".stack") && wrapCells(m.target)))
+    .observe(document.querySelector("main"), { childList: true, subtree: true });
+
+  // helpers for selects
+  const fill = (sel, vals, fmt = v => v) => { vals.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = fmt(v); sel.appendChild(o); }); };
+  const uniq = (a) => [...new Set(a)];
+
+  // matrix
+  const so = results.stopover;
+  const soDests = uniq(so.map(s => s.dest)).sort();
+  const soDates = uniq(so.map(s => s.date).filter(Boolean)).sort();
+  fill($("#mxDate"), ["", ...soDates], v => v ? short(v) : "Either");
+  fill($("#mxDest"), ["", ...soDests], v => v || "Any");
+  function drawMatrix() {
+    const d = $("#mxDest").value, dd = $("#mxDate").value;
+    const rows = so.filter(s => (!d || s.dest === d) && (!dd || s.date === dd));
+    const hubs = uniq(rows.map(r => r.hub));
+    const nights = uniq(rows.map(r => r.nights)).sort((a, b) => a - b);
+    if (!rows.length) { $("#matrix").innerHTML = `<tr><td class="empty">No stopover combinations found yet.</td></tr>`; return; }
+    const cell = {}; rows.forEach(r => { const k = r.hub + "|" + r.nights; if (!(k in cell) || r.price < cell[k]) cell[k] = r.price; });
+    const all = Object.values(cell), mn = Math.min(...all), mx = Math.max(...all);
+    const hubMin = (h) => Math.min(...nights.map(n => cell[h + "|" + n] ?? Infinity));
+    hubs.sort((a, b) => hubMin(a) - hubMin(b));
+    const shade = (p) => { const t = mx === mn ? 1 : 1 - (p - mn) / (mx - mn); const k = Math.min(5, 1 + Math.floor(t * 5)); return [`var(--seq-${k})`, k >= 4 ? "#fff" : "var(--ink)"]; };
+    let h = `<tr><th>Hub</th>${nights.map(n => `<th class="num">${n} night${n===1?"":"s"}</th>`).join("")}</tr>`;
+    hubs.forEach(hub => {
+      h += `<tr><th>${hub}${GULF.has(hub) ? " ⚠" : ""}</th>` + nights.map(n => { const p = cell[hub + "|" + n]; if (p == null) return `<td class="cell muted">—</td>`;
+        const [bg, fg] = shade(p); return `<td class="cell" style="background:${bg};color:${fg}" title="${hub}, ${n} nights: ${eur(p)}">${eur(p)}${p <= target*1.1 ? " ✔" : ""}</td>`; }).join("") + `</tr>`;
+    });
+    $("#matrix").innerHTML = h;
+  }
+  $("#mxDest").onchange = $("#mxDate").onchange = drawMatrix; drawMatrix();
+
+  // stopover table
+  fill($("#soDate"), soDates, short);
+  fill($("#soHub"), uniq(so.map(s => s.hub)).sort());
+  fill($("#soNights"), uniq(so.map(s => s.nights)).sort((a, b) => a - b));
+  fill($("#soDest"), soDests);
+  const legCell = (it) => it.legs.map(l => `${l.flight} ${l.from}→${l.to}<div class="small">${dt(l.dep)} → ${dt(l.arr)} · ${esc(l.carrier)}</div>`).join("");
+  function drawSo() {
+    const hub = $("#soHub").value, n = $("#soNights").value, d = $("#soDest").value, dd = $("#soDate").value;
+    const rows = so.filter(s => (!hub || s.hub === hub) && (n === "" || s.nights == n) && (!d || s.dest === d) && (!dd || s.date === dd)).slice(0, 40);
+    $("#soTable").innerHTML = `<tr><th class="num">Total</th><th>Leave</th><th>Via</th><th>Nights</th><th>Leg 1: Dublin → hub</th><th class="num">Leg 1</th><th>Leg 2: hub → Thailand</th><th class="num">Leg 2</th><th>Book</th></tr>` +
+      (rows.length ? rows.map(s => `<tr><td class="num" data-l="Total"><b>${eur(s.price)}</b></td><td data-l="Leave">${s.date ? short(s.date) : ""}</td><td data-l="Via">${s.hub}${gulfIn(s.leg1, s.leg2) ? "<br>" + gulfTag : ""}</td><td data-l="Nights">${s.nights}${s.nights===0?` <div class="small">${dur(s.gap_minutes)} gap</div>`:""}</td>
+        <td data-l="Leg 1">${legCell(s.leg1)}</td><td class="num" data-l="Leg 1 €">${eur(s.leg1.price)}</td><td data-l="Leg 2">${legCell(s.leg2)}</td><td class="num" data-l="Leg 2 €">${eur(s.leg2.price)}</td>
+        <td data-l="Book"><a href="${s.leg1.url}" target="_blank" rel="noopener">Leg 1</a> · <a href="${s.leg2.url}" target="_blank" rel="noopener">Leg 2</a></td></tr>`).join("")
+      : `<tr><td colspan="9" class="empty">No combinations match.</td></tr>`);
+  }
+  ["#soDate", "#soHub", "#soNights", "#soDest"].forEach(s => $(s).onchange = drawSo); drawSo();
+
+  // through table
+  const th = results.through;
+  fill($("#thOrigin"), uniq(th.map(t => t.origin)).sort());
+  fill($("#thDest"), uniq(th.map(t => t.dest)).sort());
+  fill($("#thDate"), uniq(th.map(t => t.date)).sort().reverse(), v => ddmmyy(v));
+  $("#thDate").insertAdjacentHTML("afterbegin", `<option value="${tdates.join(",")}">${tdates.map(short).join(" or ")}</option>`);
+  $("#thDate").selectedIndex = 0;
+  function drawTh() {
+    const o = $("#thOrigin").value, d = $("#thDest").value, dd = $("#thDate").value;
+    const rows = th.filter(t => (!o || t.origin === o) && (!d || t.dest === d) && (!dd || dd.split(",").includes(t.date))).slice(0, 40);
+    $("#thTable").innerHTML = `<tr><th class="num">Price</th><th>Route</th><th>Airline</th><th>Flights</th><th>Stop</th><th class="num">Journey</th><th>Book</th></tr>` +
+      (rows.length ? rows.map(t => `<tr><td class="num" data-l="Price"><b>${eur(t.price)}</b></td><td data-l="Route">${routeStr(t)}${gulfIn(t) ? "<br>" + gulfTag : ""}</td><td data-l="Airline">${esc(t.airlines.join(", "))}</td><td data-l="Flights">${legCell(t)}</td>
+        <td data-l="Stop">${t.stops === 0 ? "Direct" : t.layovers.map(l => `${l.airport} ${dur(l.minutes)}`).join(", ")}</td><td class="num" data-l="Journey">${dur(t.total_minutes)}</td>
+        <td data-l="Book"><a href="${t.url}" target="_blank" rel="noopener">Google Flights</a></td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty">No flights match.</td></tr>`);
+  }
+  ["#thOrigin", "#thDest", "#thDate"].forEach(s => $(s).onchange = drawTh); drawTh();
+
+  // routes
+  const kindName = { through: "Through-ticket", leg1: "Stopover leg 1", leg2: "Stopover leg 2" };
+  $("#routes").innerHTML = `<tr><th>Type</th><th>Route</th><th>Date</th><th class="num">Options</th><th class="num">Cheapest</th><th>Link</th></tr>` +
+    results.routes.map(r => `<tr><td data-l="Type">${kindName[r.kind]}</td><td data-l="Route">${r.origin} → ${r.dest}</td><td data-l="Date">${ddmmyy(r.date)}</td><td class="num" data-l="Options">${r.ok ? r.count : "error"}</td>
+      <td class="num" data-l="Cheapest">${r.cheapest == null ? (r.ok ? '<span class="muted">No direct</span>' : "—") : eur(r.cheapest)}</td><td data-l="Link"><a href="${r.url}" target="_blank" rel="noopener">Open</a></td></tr>`).join("");
+})();
+</script>
+</body>
+</html>

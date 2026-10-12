@@ -1,0 +1,24 @@
+{
+  "target_eur": 500,
+  "currency": "EUR",
+  "language": "en-GB",
+  "travel_dates": ["2026-12-27", "2026-12-28"],
+  "compare_dates": ["2026-12-26"],
+  "arrive_by": "2026-12-30T23:59",
+  "through": {
+    "origins": ["DUB", "ORK", "SNN"],
+    "destinations": ["BKK", "DMK", "HKT", "CNX", "KBV"],
+    "max_stops": 1
+  },
+  "stopover": {
+    "origin": "DUB",
+    "hubs": ["LHR", "LGW", "AMS", "CDG", "FRA", "MUC", "ZRH", "VIE", "CPH", "HEL", "WAW", "MXP", "BRU", "ARN",
+             "IST", "SAW", "DXB", "AUH", "DOH", "PEK"],
+    "destinations": ["BKK", "HKT"],
+    "max_extra_days": 6,
+    "min_connection_minutes": 180,
+    "leg_max_stops": 0
+  },
+  "delay_seconds": [1.5, 3.5],
+  "notes": "Edit this file to add hubs or destinations. A stopover combo is two separate tickets, each direct, so the whole trip has one stop."
+}
