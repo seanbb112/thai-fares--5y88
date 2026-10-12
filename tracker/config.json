@@ -4,7 +4,7 @@
   "language": "en-GB",
   "travel_dates": ["2026-12-27", "2026-12-28"],
   "compare_dates": ["2026-12-26"],
-  "arrive_by": "2026-12-30T23:59",
+  "arrive_by": "2026-12-30T12:00",
   "through": {
     "origins": ["DUB", "ORK", "SNN"],
     "destinations": ["BKK", "DMK", "HKT", "CNX", "KBV"],

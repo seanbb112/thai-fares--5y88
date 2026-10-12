@@ -212,7 +212,7 @@ a.tile.link:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(25
   const { meta, results, history } = T;
   const target = meta.target_eur;
   $("#target").textContent = target;
-  if (meta.arrive_by) $("#arriveBy").textContent = ` Only flights landing in Thailand by ${meta.arrive_by.slice(8,10)}/${meta.arrive_by.slice(5,7)} are shown.`;
+  if (meta.arrive_by) $("#arriveBy").textContent = ` Only flights landing in Thailand by ${meta.arrive_by.slice(11,16)} on ${meta.arrive_by.slice(8,10)}/${meta.arrive_by.slice(5,7)} are shown.`;
 
   // freshness
   const fin = new Date(meta.finished);
