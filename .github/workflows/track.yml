@@ -36,6 +36,7 @@ jobs:
 
       - name: Search Google Flights
         run: python tracker/tracker.py
+        continue-on-error: true   # a failed sweep still saves its log and keeps the last good page up
 
       - name: Save price history
         run: |

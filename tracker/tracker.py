@@ -277,5 +277,6 @@ if __name__ == "__main__":
         m, r = run()
         write(m, r)
     except Exception:
+        traceback.print_exc()
         log("CRASH " + traceback.format_exc().replace("\n", " | "))
         sys.exit(1)
