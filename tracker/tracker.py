@@ -54,6 +54,28 @@ def log(msg):
         f.write(f"{now_irl():%d/%m/%y %H:%M:%S} {msg}\n")
 
 
+def booking_url(it, origin, dest, date):
+    """Google Flights link narrowed to this one itinerary.
+
+    Google has no link to a single flight, so filter the search by its airlines, departure
+    hour and layover length; the itinerary then shows alone (or first) with its booking options.
+    """
+    first = it["legs"][0]
+    hour = int(first["dep"][11:13])
+    lay = it["layovers"][0]["minutes"] if it["layovers"] else None
+    q = create_query(
+        flights=[FlightQuery(
+            date=date, from_airport=origin, to_airport=dest, max_stops=it["stops"],
+            airlines=sorted({l["code"] for l in it["legs"] if l["code"]}) or None,
+            earliest_departure_hour=hour, latest_departure_hour=hour,
+            min_layover_minutes=lay - 5 if lay else None, max_layover_minutes=lay + 5 if lay else None,
+        )],
+        trip="one-way", seat="economy", passengers=Passengers(adults=1),
+        language=CONFIG["language"], currency=CONFIG["currency"],
+    )
+    return q.url()
+
+
 def search(origin, dest, date, max_stops):
     """Return (google_flights_url, [itinerary dicts]) for one route and date."""
     global query_count
@@ -99,6 +121,7 @@ def search(origin, dest, date, max_stops):
                     "dep": "%04d-%02d-%02dT%02d:%02d" % (*s[20], dep_t[0] or 0, dep_t[1] or 0),
                     "arr": "%04d-%02d-%02dT%02d:%02d" % (*s[21], arr_t[0] or 0, arr_t[1] or 0),
                     "flight": f"{s[22][0]}{s[22][1]}" if s[22] else "",
+                    "code": s[22][0] if s[22] else "",
                     "carrier": s[22][3] if s[22] and len(s[22]) > 3 else "",
                     "minutes": s[11],
                 })
@@ -111,6 +134,8 @@ def search(origin, dest, date, max_stops):
                 "layovers": layovers,
                 "total_minutes": f[9],
             })
+    for it in out:
+        it["book_url"] = booking_url(it, origin, dest, date)
     # Google repeats some itineraries across blocks; keep the cheapest of each
     seen = {}
     for it in out:
