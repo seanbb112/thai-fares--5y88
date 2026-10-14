@@ -3,7 +3,16 @@
 One-way, 1 adult, economy, Ireland → Thailand, leaving 27/12/26 or 28/12/26, direct or one stop.
 Target: around €500. Personal project, not deal material.
 
-## What it searches (every hour)
+## Schedule
+
+- **Full search every 2 hours:** every route below (~225 searches, ~12 min). It also picks the
+  5 routes giving the cheapest fares (the watchlist).
+- **Quick check every 30 minutes in between:** only the watchlist (~5 searches, under a minute).
+  Everything else stays as the last full search left it.
+- GitHub's scheduler is best-effort, so runs can be late. Manual update: GitHub → Actions →
+  Flight sweep → Run workflow (quick or full).
+
+## What it searches
 
 - **Through-tickets:** Dublin, Cork, Shannon → Bangkok (BKK, DMK), Phuket, Chiang Mai, Krabi, max one stop.
   Dublin on 26/12 as well, for comparison with the earlier `asia-trip` plan date.
